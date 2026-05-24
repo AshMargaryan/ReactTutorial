@@ -1,21 +1,47 @@
 import MovieCard from "../components/MovieCard"
-import {useState} from "react"
+import {useState, useEffect} from "react"
+import { searchMovies, getPopularMovies } from "../services/api.js"
 import "../css/Home.css"
 
 function Home() {
     const [searchQuery, setSearchQuery] = useState("")
+    const [movies, setMovies] = useState([])
+    const [error, setError] = useState(null)
+    const [loading, setLoading] = useState(true)
 
-    const movies = [
-        {id:1, title: "Shawshank Redemption", release_date: "1994", url: "https://m.media-amazon.com/images/I/51NiGlapXlL._AC_.jpg"},
-        {id:2, title: "The Godfather", release_date: "1972", url: "https://m.media-amazon.com/images/I/41+eK8zBwQL._AC_.jpg"},
-        {id:3, title: "The Dark Knight", release_date: "2008", url: "https://m.media-amazon.com/images/I/51EbJjlLJGL._AC_.jpg"},
-        {id:4, title: "Pulp Fiction", release_date: "1994", url: "https://m.media-amazon.com/images/I/51V5ZpFyaFL._AC_.jpg"},
-        {id:5, title: "The Lord of the Rings: The Return of the King", release_date: "2003", url: "https://m.media-amazon.com/images/I/51Qvs9i5a%2BL._AC_.jpg"},
-    ]
+    useEffect(() => {
+        const loadPopularMovies = async () => {
+            try{
+                const popularMovies = await getPopularMovies()
+                setMovies(popularMovies)
+            } catch(err) {
+                setError("Failed to load popular movies.")
+                console.log(err)
+            } finally {
+                setLoading(false)
+            }
+        }
+        loadPopularMovies()
+    }, [])
+    
 
-    const handleSearch = (e) => {
+    const handleSearch = async (e) => {
         e.preventDefault()
-        alert(searchQuery)
+        if (!searchQuery.trim()) return
+        if (loading) return
+
+        setLoading(true)
+        try {
+            const searchResults = await searchMovies(searchQuery)
+            setMovies(searchResults)
+            setError(null)
+        }catch(err) {
+            setError("Failed to search movies.")
+            console.log(err)
+        } finally {
+            setLoading(false)
+        }
+        
     }
 
     return (
@@ -31,14 +57,20 @@ function Home() {
                 <button type="submit" className="search-button">Search</button>
             </form>
 
-            <div className="movies-grid">
-                {movies.map(
-                    (movie) => 
-                        movie.title.toLowerCase().includes(searchQuery.toLowerCase() ) &&  (
+            {error && <div className="error">{error}</div>}
+
+            {loading ? (
+                <div className="loading">Loading...</div>
+            ) : (
+                <div className="movies-grid">
+                    {movies.map(
+                        (movie) => 
+                            movie.title.toLowerCase().includes(searchQuery.toLowerCase() ) &&  (
                         <MovieCard key={movie.id} movie={movie} />
                         )
                 )}
             </div>
+            )}
         </div>
     );
 }
