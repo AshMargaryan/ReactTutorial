@@ -1,5 +1,5 @@
 import MovieCard from "../components/MovieCard"
-import {useState, useEffect} from "react"
+import {useState, useEffect, useRef } from "react"
 import { searchMovies, getPopularMovies } from "../services/api.js"
 import "../css/Home.css"
 
@@ -8,21 +8,52 @@ function Home() {
     const [movies, setMovies] = useState([])
     const [error, setError] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [page, setPage] = useState(1)
+    const [hasMore, setHasMore] = useState(true)
+    const bottomRef = useRef(null)
 
     useEffect(() => {
         const loadPopularMovies = async () => {
-            try{
-                const popularMovies = await getPopularMovies()
-                setMovies(popularMovies)
-            } catch(err) {
+            try {
+                const popularMovies = await getPopularMovies(page)
+                setMovies((prevMovies) =>
+                    page === 1 ? popularMovies : [...prevMovies, ...popularMovies]
+                )
+                setHasMore(popularMovies.length > 0)
+            } catch (err) {
                 setError("Failed to load popular movies.")
                 console.log(err)
             } finally {
                 setLoading(false)
             }
         }
+
         loadPopularMovies()
-    }, [])
+    }, [page])
+
+    useEffect(() => {
+        const target = bottomRef.current
+        if (!target) return
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting && !loading && !searchQuery.trim() && hasMore) {
+                        setLoading(true)
+                        setPage((prevPage) => prevPage + 1)
+                    }
+                })
+            },
+            { threshold: 0.1 }
+        )
+
+        observer.observe(target)
+
+        return () => {
+            observer.disconnect()
+        }
+    }, [loading, searchQuery, hasMore])
+
     
 
     const handleSearch = async (e) => {
@@ -59,17 +90,23 @@ function Home() {
 
             {error && <div className="error">{error}</div>}
 
-            {loading ? (
+            {loading && movies.length === 0 ? (
                 <div className="loading">Loading...</div>
             ) : (
-                <div className="movies-grid">
-                    {movies.map(
-                        (movie) => 
-                            movie.title.toLowerCase().includes(searchQuery.toLowerCase() ) &&  (
-                        <MovieCard key={movie.id} movie={movie} />
-                        )
-                )}
-                </div>
+                <>
+                    <div className="movies-grid">
+                        {movies.map(
+                            (movie) => 
+                                movie.title.toLowerCase().includes(searchQuery.toLowerCase() ) &&  (
+                            <MovieCard key={movie.id} movie={movie} />
+                            )
+                        )}
+                    </div>
+                    <div ref={bottomRef} style={{ height: "20px" }}></div>
+                    {loading && movies.length > 0 && (
+                        <div className="loading">Loading more movies...</div>
+                    )}
+                </>
             )}
         </div>
     );
